@@ -68,7 +68,8 @@ class Filter:
         """
         adata.obs['mito_total'] = adata[:, adata.var_names.str.startswith('MT-')].X.sum(axis=1)
         adata.obs['percent_mito'] = adata.obs['mito_total'] / adata.X.sum(axis=1)
-        return adata[adata.obs['percent_mito'] < self.percent_mt_max]
+        # percent_mito is a fraction (0-1); percent_mt_max is expressed as a percentage.
+        return adata[adata.obs['percent_mito'] < self.percent_mt_max / 100]
 
     @staticmethod
     def filter_gene_variance(adata, mt_list):

@@ -9,6 +9,19 @@ from scimilarity.src.scimilarity.utils import lognorm_counts
 from scimilarity.src.scimilarity import CellAnnotation, align_dataset
 
 
+def _resolve_input(afile):
+    """Resolve the CSV input file and sample name from either a CSV file
+    path (e.g. ``.../<gsm>/<gsm>.csv``) or the sample directory that
+    contains it (e.g. ``.../<gsm>``)."""
+    if os.path.isfile(afile):
+        count_file = os.path.basename(afile)
+        if count_file.endswith(".csv"):
+            count_file = count_file[:-4]
+        return afile, count_file
+    count_file = os.path.basename(afile.rstrip("/\\"))
+    return f"{afile}/{count_file}.csv", count_file
+
+
 class AnnotationHuman:
     def __init__(self, annotation_path, python_module_path):
         """
@@ -39,8 +52,7 @@ class AnnotationHuman:
         """
         specie = kwargs.get('specie', 'human')
         output_dir = kwargs.get('output_dir', os.path.join(os.getcwd(), "annotated_data"))
-        count_file = os.path.basename(afile)
-        input_file = f"{afile}/{count_file}.csv"
+        input_file, count_file = _resolve_input(afile)
         outfile_dir = f"{output_dir}/{specie}/{count_file}"
         tmpfile = f"{output_dir}/{specie}/{count_file}.tmp"
 
@@ -145,9 +157,8 @@ class AnnotationMouse:
         """
         specie = kwargs.get('specie', 'mouse')  # Default specie is 'mouse'
         output_dir = kwargs.get('output_dir', os.path.join(os.getcwd(), "annotated_data"))
-        count_file = os.path.basename(afile)  # Extract filename
 
-        input_file = f"{afile}/{count_file}.csv"
+        input_file, count_file = _resolve_input(afile)
         outfile_dir = f"{output_dir}/{specie}/{count_file}"
         tmpfile = f"{output_dir}/{specie}/{count_file}.tmp"
 
@@ -290,9 +301,8 @@ class AnnotationOtherSpecie:
         """
         specie = kwargs.get('specie')
         output_dir = kwargs.get('output_dir', os.path.join(os.getcwd(), "annotated_data"))
-        count_file = os.path.basename(afile)
 
-        input_file = f"{afile}/{count_file}.csv"
+        input_file, count_file = _resolve_input(afile)
         outfile_dir = f"{output_dir}/{specie}/{count_file}"
         tmpfile = f"{output_dir}/{specie}/{count_file}.tmp"
         homologous_gene_dir = os.path.join(kwargs.get('homologous_gene_dir'), f"human2{specie}.csv")

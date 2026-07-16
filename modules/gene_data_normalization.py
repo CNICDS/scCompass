@@ -148,8 +148,9 @@ class GeneDataNormalization:
     def process(self, afile, cut_max_len=-1, **kwargs):
         """Main function to process the data."""
         output_dir = kwargs.get('output_dir', os.path.join(os.getcwd(), "normalization_data"))
-        h5ad_data_path = os.path.join(output_dir, self.specie, os.path.basename(afile).replace('.csv', '.h5ad'))
-        outfile_dir = os.path.join(output_dir, f"hf/{self.specie}".rsplit('/', 1)[0])
+        gsm = os.path.basename(afile).replace('.csv', '')
+        h5ad_data_path = os.path.join(output_dir, self.specie, f"{gsm}.h5ad")
+        outfile_dir = os.path.join(output_dir, "hf", self.specie, gsm)
         tmpfile = f"{outfile_dir}.tmp"
 
         if os.path.exists(outfile_dir):
@@ -169,11 +170,13 @@ class GeneDataNormalization:
         adata.write(h5ad_data_path)
 
         tokens = self.load_tokens()
-        cut_max_len = min(cut_max_len, adata.shape[1])
+        if cut_max_len is None or cut_max_len < 0:
+            cut_max_len = adata.shape[1]
+        else:
+            cut_max_len = min(cut_max_len, adata.shape[1])
         input_genes, input_ids, lengths, values = self.transform_data(adata, tokens, cut_max_len)
 
-        dataset = self.export_to_huggingface(adata, lengths, input_genes, input_ids, values,
-                                             outfile_dir.split('/')[-1])
+        dataset = self.export_to_huggingface(adata, lengths, input_genes, input_ids, values, gsm)
         self.save_dataset(outfile_dir, dataset, lengths)
 
         os.unlink(tmpfile)
