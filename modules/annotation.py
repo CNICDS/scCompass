@@ -5,6 +5,12 @@ import pandas as pd
 import anndata as ad
 import datetime
 import rpy2.robjects as robjects
+
+# Make the vendored ``scimilarity`` package importable as a top-level module
+# (it lives at ``modules/scimilarity``). This must happen before the imports
+# below, which run at module load time.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from scimilarity.src.scimilarity.utils import lognorm_counts
 from scimilarity.src.scimilarity import CellAnnotation, align_dataset
 
