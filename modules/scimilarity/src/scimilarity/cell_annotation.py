@@ -339,7 +339,7 @@ class CellAnnotation(CellEmbedding):
                 celltype_weighted = defaultdict(float)
                 for neighbor, dist in zip(nns, d_nns):
                     celltype[self.idx2label[neighbor]] += 1
-                    celltype_weighted[self.idx2label[neighbor]] += 1 / dist
+                    celltype_weighted[self.idx2label[neighbor]] += float(1 / dist)
                 # predict based on consensus max occurrence
                 if weighting:
                     predictions.append(
