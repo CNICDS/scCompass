@@ -164,9 +164,9 @@ def main() -> None:
                 args.annotation_model_path,
             )
         elif step == "map":
-            if not args.annotated_pattern:
-                raise ValueError("--annotated-pattern is required when step includes 'map'")
-            gene_mapping_pipeline(args.annotated_pattern, args.species, args.map_output, base_dir)
+            if not args.filtered_pattern:
+                raise ValueError("--filtered-pattern is required when step includes 'map'")
+            gene_mapping_pipeline(args.filtered_pattern, args.species, args.map_output, base_dir)
         elif step == "merge":
             if not args.metadata_path:
                 raise ValueError("--metadata-path is required when step includes 'merge'")
