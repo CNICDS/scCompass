@@ -69,7 +69,7 @@ python main.py \
   --species human \
   --steps map \
   --project-root /path/to/scCompass \
-  --annotated-pattern "/path/to/outputs/annotated_data/human/*/*.csv" \
+  --filter-output "/path/to/outputs/filtered_data/human/*/*.csv" \
   --map-output /path/to/outputs/mapping_data
 ```
 
