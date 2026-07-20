@@ -80,11 +80,15 @@ python main.py \
   --species human \
   --steps merge \
   --project-root /path/to/scCompass \
-  --filter-output /path/to/outputs/filtered_data \
+  --annotate-output /path/to/outputs/annotated_data \
   --map-output /path/to/outputs/mapping_data \
   --merge-output /path/to/outputs/merged_data \
   --metadata-path /path/to/metadata
 ```
+
+`merge` 会把每个样本的细胞类型标签（来自 annotate 步骤）与其映射后的计数矩阵
+（来自 map 步骤）配对，因此 `--annotate-output` 与 `--map-output` 都必须指向对应
+步骤实际产出的目录。
 
 `--metadata-path` 目录下需要包含 `<species>.xlsx`（例如 `human.xlsx`），并至少包含 `Organ` 列。
 

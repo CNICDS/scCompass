@@ -82,11 +82,15 @@ python main.py \
   --species human \
   --steps merge \
   --project-root /path/to/scCompass \
-  --filter-output /path/to/outputs/filtered_data \
+  --annotate-output /path/to/outputs/annotated_data \
   --map-output /path/to/outputs/mapping_data \
   --merge-output /path/to/outputs/merged_data \
   --metadata-path /path/to/metadata
 ```
+
+`merge` pairs each sample's cell-type labels (from the annotate step) with its
+mapped count matrix (from the map step), so both `--annotate-output` and
+`--map-output` must point at the directories produced by those steps.
 
 `--metadata-path` must contain `<species>.xlsx` (for example `human.xlsx`) with at least the `Organ` column.
 
