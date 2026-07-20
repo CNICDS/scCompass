@@ -6,12 +6,15 @@ import pandas as pd
 
 
 class SpeciesDataProcessor:
-    def __init__(self, specie_name, filter_dir, mapping_dir, merge_dir, metadata_path):
+    def __init__(self, specie_name, annotation_dir, mapping_dir, merge_dir, metadata_path):
         """
         Initialize the class with paths and the species name.
+
+        ``annotation_dir`` is the annotation output root; it holds the
+        ``<sample>_cell_type.csv`` files this step consumes.
         """
         self.specie_name = specie_name
-        self.filter_dir = os.path.join(filter_dir, specie_name)
+        self.annotation_dir = os.path.join(annotation_dir, specie_name)
         self.mapping_dir = os.path.join(mapping_dir, specie_name)
         self.merge_dir = os.path.join(merge_dir, specie_name)
         self.metadata_path = metadata_path
@@ -52,10 +55,13 @@ class SpeciesDataProcessor:
             sample_name = index
             organ_name = re.sub(r'\s', '', row["Organ"])
 
-            sample_cell_type_dir = f"{self.filter_dir}/{sample_name}"
+            sample_cell_type_dir = f"{self.annotation_dir}/{sample_name}"
             sample_gene_mapping_dir = f"{self.mapping_dir}/{sample_name}"
 
-            if not (os.path.exists(sample_cell_type_dir) and os.path.exists(sample_gene_mapping_dir)):
+            cell_type_file = f"{sample_cell_type_dir}/{sample_name}_cell_type.csv"
+            cell_mapping_file = f"{sample_gene_mapping_dir}/{sample_name}.csv"
+
+            if not (os.path.exists(cell_type_file) and os.path.exists(cell_mapping_file)):
                 continue
 
             sample_num += 1
@@ -64,9 +70,6 @@ class SpeciesDataProcessor:
 
             print(out_str)
             self.write_logs(self.merge_dir, out_str)
-
-            cell_type_file = f"{sample_cell_type_dir}/{sample_name}_cell_type.csv"
-            cell_mapping_file = f"{sample_gene_mapping_dir}/{sample_name}.csv"
 
             try:
                 cell_types = pd.read_csv(cell_type_file, header=None)

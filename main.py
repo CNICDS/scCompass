@@ -86,7 +86,7 @@ def gene_mapping_pipeline(input_pattern: str, species_name: str, output_dir: str
 
 
 def gene_merging_pipeline(
-    filter_dir: str,
+    annotation_dir: str,
     mapping_dir: str,
     species_name: str,
     output_dir: str,
@@ -94,7 +94,7 @@ def gene_merging_pipeline(
 ) -> None:
     from modules import SpeciesDataProcessor
 
-    merge_instance = SpeciesDataProcessor(species_name, filter_dir, mapping_dir, output_dir, metadata_path)
+    merge_instance = SpeciesDataProcessor(species_name, annotation_dir, mapping_dir, output_dir, metadata_path)
     merge_instance()
 
 
@@ -171,7 +171,7 @@ def main() -> None:
             if not args.metadata_path:
                 raise ValueError("--metadata-path is required when step includes 'merge'")
             gene_merging_pipeline(
-                args.filter_output,
+                args.annotate_output,
                 args.map_output,
                 args.species,
                 args.merge_output,
