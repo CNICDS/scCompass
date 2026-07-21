@@ -100,8 +100,7 @@ mapped count matrix (from the map step), so both `--annotate-output` and
 - `--steps`: steps to run, any combination of `filter normalize annotate map merge`
 - `--project-root`: project root containing `gene_data/` and `modules/`
 - `--input-pattern`: input CSV glob (required for `filter`)
-- `--filtered-pattern`: filtered CSV glob (required for `normalize`/`annotate`)
-- `--annotated-pattern`: annotated CSV glob (required for `map`)
+- `--filtered-pattern`: filtered CSV glob (required for `normalize`/`annotate`/`map`)
 - `--annotation-model-path`: annotation model path
 - `--metadata-path`: metadata directory for `merge`
 
