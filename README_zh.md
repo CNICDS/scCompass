@@ -69,7 +69,7 @@ python main.py \
   --species human \
   --steps map \
   --project-root /path/to/scCompass \
-  --filter-output "/path/to/outputs/filtered_data/human/*/*.csv" \
+  --filtered-pattern "/path/to/outputs/filtered_data/human/*/*.csv" \
   --map-output /path/to/outputs/mapping_data
 ```
 
@@ -98,8 +98,7 @@ python main.py \
 - `--steps`: 要执行的步骤，支持组合：`filter normalize annotate map merge`
 - `--project-root`: 项目根目录（应包含 `gene_data/` 与 `modules/`）
 - `--input-pattern`: 原始 CSV 输入 glob（`filter` 必填）
-- `--filtered-pattern`: 过滤后 CSV 输入 glob（`normalize`/`annotate` 必填）
-- `--annotated-pattern`: 注释后 CSV 输入 glob（`map` 必填）
+- `--filtered-pattern`: 过滤后 CSV 输入 glob（`normalize`/`annotate`/`map` 必填）
 - `--annotation-model-path`: 注释模型路径
 - `--metadata-path`: 合并步骤使用的元数据目录（`merge` 必填）
 

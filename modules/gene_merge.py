@@ -72,9 +72,22 @@ class SpeciesDataProcessor:
             self.write_logs(self.merge_dir, out_str)
 
             try:
-                cell_types = pd.read_csv(cell_type_file, header=None)
-                cell_mapping_data = np.loadtxt(cell_mapping_file, delimiter=',', dtype=int)
+                # The annotation step writes this file via ``DataFrame.to_csv``
+                # with a header row and the row position as the index column,
+                # e.g. ``\n,0\n0,T-cell\n1,B-cell``. Read it back the same way
+                # so the index stays integer-typed (index column -> row number,
+                # remaining column -> predicted cell type).
+                cell_types = pd.read_csv(cell_type_file, header=0, index_col=0)
+                # A single-row mapping file loads as a 1-D array; force 2-D so
+                # row selection below stays valid.
+                cell_mapping_data = np.atleast_2d(
+                    np.loadtxt(cell_mapping_file, delimiter=',', dtype=int)
+                )
             except pd.errors.EmptyDataError:
+                self.append_line(cell_type_file, "empty_data.txt")
+                continue
+
+            if cell_types.empty:
                 self.append_line(cell_type_file, "empty_data.txt")
                 continue
 
@@ -85,16 +98,22 @@ class SpeciesDataProcessor:
     def process_cell_types(self, organ_name, cell_types_data, cell_mapping_data):
         """
         Process cell types and save the data to corresponding files.
+
+        ``cell_types_data`` is indexed by the cell's row position in the
+        mapped count matrix; its single column holds the predicted cell type.
         """
-        grouped = cell_types_data.groupby(1)
+        cell_type_column = cell_types_data.columns[0]
+        grouped = cell_types_data.groupby(cell_type_column)
         for key, group in grouped:
             print(f"Processing category: {key}")
 
-            current_cell_type = re.sub(r'\s', '', key)
+            current_cell_type = re.sub(r'\s', '', str(key))
             current_cell_type = re.sub(r'[^\w-]', '-', current_cell_type)
 
             target_merge_file = f"{self.merge_dir}/{organ_name}_{current_cell_type}.csv"
-            current_cell_type_indexes = np.array(group[0])
+            # Row positions come from the index (integer cell numbers), which is
+            # what numpy needs for row selection.
+            current_cell_type_indexes = group.index.to_numpy(dtype=int)
             current_cell_type_data = cell_mapping_data[current_cell_type_indexes, :]
 
             with open(target_merge_file, 'a', newline='') as file:
