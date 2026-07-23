@@ -1,10 +1,10 @@
 import os
 import sys
+import subprocess
 import scanpy as sc
 import pandas as pd
 import anndata as ad
 import datetime
-import rpy2.robjects as robjects
 
 # Make the vendored ``scimilarity`` package importable as a top-level module
 # (it lives at ``modules/scimilarity``). This must happen before the imports
@@ -136,13 +136,23 @@ class AnnotationHuman:
 
 
 class AnnotationMouse:
-    def __init__(self, python_module_path):
+    def __init__(self, python_module_path, r_script_path=None):
         """
         Initialize the class and set required paths.
+
+        ``r_script_path`` points at ``scripts/mouse_annotation.R``; it defaults
+        to the copy shipped alongside the project root (``python_module_path``).
         """
 
         # Set Python module paths
         sys.path.append(python_module_path)
+
+        # Locate the Rscript driver. Mouse annotation runs Seurat + scMayoMap
+        # through an external Rscript process rather than rpy2, so the R logic
+        # is shared with the standalone scripts/annotation_mouse.sh driver.
+        self.r_script_path = r_script_path or os.path.join(
+            python_module_path, "scripts", "mouse_annotation.R"
+        )
         print("scimilarity imported!")
 
     def write_logs(self, out_path, step_num, cell_num, success):
@@ -204,22 +214,23 @@ class AnnotationMouse:
         # Start the annotation process
         START_TIME = datetime.datetime.now()
         try:
-            # Read the input data
-            df = pd.read_csv(input_file, header=0, index_col=0)
-            print("Data loaded successfully.")
+            # Run the external Rscript. It reads the count matrix, runs the
+            # Seurat + scMayoMap pipeline, and writes
+            # ``<count_file>_cell_type.csv`` into ``outfile_dir`` itself, using
+            # a 0-based integer index so the layout matches the other-species
+            # annotation path and the downstream merge step.
+            if not os.path.exists(self.r_script_path):
+                raise FileNotFoundError(
+                    f"Mouse annotation R script not found: {self.r_script_path}"
+                )
 
-            # Execute the R script for annotation
-            r_script = self.generate_r_script(input_file)
-            r_results = robjects.r(r_script)
-
-            # Convert R output to DataFrame
-            type_res = pd.DataFrame(r_results).T
+            subprocess.run(
+                ["Rscript", self.r_script_path, input_file, outfile_dir, specie],
+                check=True,
+            )
 
             END_TIME = datetime.datetime.now()
             print(f"Time Cost: {(END_TIME - START_TIME).seconds} seconds")
-
-            # Export the annotation results
-            type_res.to_csv(os.path.join(outfile_dir, f"{count_file}_cell_type.csv"), index=True)
             print("Data exported")
 
         finally:
@@ -227,47 +238,6 @@ class AnnotationMouse:
             if os.path.exists(tmpfile):
                 os.unlink(tmpfile)
             self.write_logs(outfile_dir, "7", "-1", True)
-
-    @staticmethod
-    def generate_r_script(input_file):
-        """
-        Generate the R script for annotation with automatic package installation.
-        """
-        return f'''
-        # Load libraries
-        library(Seurat)
-        library(data.table)
-        library(dplyr)
-        library(ggplot2)
-        library(scMayoMap)
-
-        # Read and process the input data
-        count_matrix <- fread("{input_file}")
-        count_matrix2 <- t(count_matrix)
-        colnames(count_matrix2) <- count_matrix2[1, ]
-        count_matrix2 <- count_matrix2[-1, ]
-        count_matrix2 <- count_matrix2[!duplicated(rownames(count_matrix2)), ]
-        seurat.obj <- CreateSeuratObject(counts = count_matrix2)
-        seurat.obj$percent.mt <- PercentageFeatureSet(object = seurat.obj, pattern = "^mt-")
-        seurat.obj <- NormalizeData(object = seurat.obj, verbose = FALSE)
-        seurat.obj <- FindVariableFeatures(object = seurat.obj, verbose = FALSE)
-        seurat.obj <- ScaleData(object = seurat.obj, verbose = FALSE)
-        seurat.obj <- RunPCA(object = seurat.obj, verbose = FALSE)
-        seurat.obj <- FindNeighbors(object = seurat.obj, verbose = FALSE)
-        seurat.obj <- FindClusters(object = seurat.obj, verbose = FALSE)
-        seurat.markers <- FindAllMarkers(seurat.obj, method = 'MAST', verbose = FALSE)
-        scMayoMap.obj <- scMayoMap(data = seurat.markers, database = scMayoMapDatabase)
-
-        # Map cell types
-        max_col_names <- apply(scMayoMap.obj$annotation.norm, 1, function(x) colnames(scMayoMap.obj$annotation.norm)[which.max(x)])
-        seurat.obj@meta.data$celltype <- plyr::mapvalues(
-            seurat.obj@meta.data$seurat_clusters, from = names(max_col_names), to = max_col_names
-        )
-        seurat.obj@meta.data$celltype <- as.character(seurat.obj@meta.data$celltype)
-        seurat.obj@meta.data$celltype <- sapply(seurat.obj@meta.data$celltype, function(x) strsplit(x, ":")[[1]][2])
-        celltype_col <- seurat.obj@meta.data[, 'celltype', drop = FALSE]
-        celltype_col
-        '''
 
     def __call__(self, data, **kwargs):
         """
