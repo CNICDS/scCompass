@@ -20,7 +20,9 @@ pip install -r requirements.txt
 
 Notes:
 
-- The annotation step depends on `rpy2` and R packages (mouse annotation path).
+- Mouse annotation shells out to `Rscript scripts/mouse_annotation.R`, so a
+  local R with `Seurat`, `data.table`, `dplyr`, `ggplot2` and `scMayoMap`
+  installed must be on `PATH`. No `rpy2` is required.
 - Keep reference files under `gene_data/` (gene lists, tokens, mid values, etc.).
 
 ## 2. Directory Conventions
@@ -108,7 +110,9 @@ mapped count matrix (from the map step), so both `--annotate-output` and
 
 - `No files matched pattern`: the glob didn’t match any files; check the path and quoting.
 - `--xxx is required`: a required argument for the selected step is missing.
-- R-related errors in annotation: ensure local R and required R packages are installed.
+- R-related errors in mouse annotation: ensure `Rscript` is on `PATH` and the
+  `Seurat`, `data.table`, `dplyr`, `ggplot2`, `scMayoMap` packages are installed.
+  For batch runs outside the Python pipeline, use `scripts/annotation_mouse.sh`.
 
 ## Citation
 

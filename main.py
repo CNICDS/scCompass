@@ -57,7 +57,10 @@ def data_annotation_pipeline(
             python_module_path=base_dir,
         )
     elif species_name == "mouse":
-        annotation_instance = AnnotationMouse(python_module_path=base_dir)
+        annotation_instance = AnnotationMouse(
+            python_module_path=base_dir,
+            r_script_path=os.path.join(base_dir, "scripts", "mouse_annotation.R"),
+        )
     else:
         homologous_gene_dir = os.path.join(base_dir, "gene_data", "homologous_gene")
         annotation_instance = AnnotationOtherSpecie(

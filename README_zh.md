@@ -18,7 +18,9 @@ pip install -r requirements.txt
 
 说明：
 
-- 注释步骤会依赖 `rpy2` 和 R 侧包（鼠标注释路径）。
+- 鼠标（mouse）注释通过 `Rscript scripts/mouse_annotation.R` 外部调用完成，
+  因此需要本机安装 R，并安装 `Seurat`、`data.table`、`dplyr`、`ggplot2`、
+  `scMayoMap` 等 R 包，且 `Rscript` 在 `PATH` 中可用。不再依赖 `rpy2`。
 - `gene_data/` 下需要保留项目自带参考文件（基因列表、token、mid values 等）。
 
 ## 2. 目录约定
