@@ -19,19 +19,32 @@ set -euo pipefail
 # of the caller's working directory.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 R_SCRIPT="$SCRIPT_DIR/mouse_annotation.R"
+RESULT_VALIDATOR="$SCRIPT_DIR/../modules/annotation_result.py"
+PYTHON="${PYTHON:-python3}"
 
 animal="${3:-${ANIMAL:-mouse}}"
 input_dir="${1:-${INPUT_DIR:-/mnt/cstr/celldata/h5ad/kun/csv_mouse}}"
 output_dir="${2:-${OUTPUT_DIR:-/mnt/cstr/celldata/control/data_annotation_20260701}}"
 jobs="${4:-${JOBS:-4}}"
 
+if [ "$animal" != mouse ]; then
+    echo "[ERROR] This annotation driver supports only mouse." >&2
+    exit 1
+fi
+if ! [[ "$jobs" =~ ^[1-9][0-9]*$ ]]; then
+    echo "[ERROR] jobs must be a positive integer." >&2
+    exit 1
+fi
+command -v "$PYTHON" >/dev/null || { echo "[ERROR] Python 3 is required for result validation." >&2; exit 1; }
+
 # Annotation function
-annotate_file() {
+annotate_file() (
+    set -euo pipefail
     local file="$1"
 
     if [ ! -f "$file" ]; then
-        echo "[ERROR] File not found: $file"
-        return
+        echo "[ERROR] File not found: $file" >&2
+        return 1
     fi
 
     echo "[INFO] Processing file: $file"
@@ -42,18 +55,26 @@ annotate_file() {
     local outfile="$outfile_dir/${gsm}_cell_type.csv"
     local log_file="$outfile_dir/logs.txt"
 
-    if [ -f "$outfile" ]; then
-        echo "[INFO] Annotation already completed: $file"
-        return
+    mkdir -p "$output_dir/$animal"
+    # noclobber uses exclusive creation, matching Python's open(..., 'x').
+    if ! (set -o noclobber; : > "$tmpfile") 2>/dev/null; then
+        if [ -e "$tmpfile" ] || [ -L "$tmpfile" ]; then
+            echo "[INFO] Annotation already in progress: $file"
+            return 0
+        fi
+        echo "[ERROR] Could not create annotation lock: $tmpfile" >&2
+        return 1
     fi
+    trap 'rm -f -- "$tmpfile"' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
 
-    if [ -f "$tmpfile" ]; then
-        echo "[INFO] Annotation already in progress: $file"
-        return
+    if "$PYTHON" "$RESULT_VALIDATOR" "$outfile" "$file"; then
+        echo "[INFO] Annotation already completed: $file"
+        return 0
     fi
 
     mkdir -p "$outfile_dir"
-    touch "$tmpfile"
     echo "Annotation Start: $(date)" >> "$log_file"
     echo "Processing file: $file" >> "$log_file"
 
@@ -61,27 +82,29 @@ annotate_file() {
     start_time="$(date +%s)"
 
     if ! Rscript "$R_SCRIPT" "$file" "$outfile_dir" "$animal"; then
-        echo "[ERROR] Rscript failed for file: $file"
+        echo "[ERROR] Rscript failed for file: $file" >&2
         echo "Rscript failed for file: $file" >> "$log_file"
-        rm -f "$tmpfile"
-        return
+        return 1
+    fi
+    if ! "$PYTHON" "$RESULT_VALIDATOR" "$outfile" "$file"; then
+        echo "[ERROR] Rscript did not produce a valid result: $outfile" >&2
+        echo "Missing, incomplete or invalid result: $outfile" >> "$log_file"
+        return 1
     fi
 
     end_time="$(date +%s)"
     duration=$((end_time - start_time))
     echo "Annotation completed in $duration seconds"
     echo "Annotation completed in $duration seconds" >> "$log_file"
-
-    rm -f "$tmpfile"
-}
+)
 
 # Export function and variables for the parallel subshells.
 export -f annotate_file
-export R_SCRIPT output_dir animal
+export R_SCRIPT RESULT_VALIDATOR PYTHON output_dir animal
 
 # Find all target CSV files and annotate them in parallel.
-find "$input_dir" -name "*.csv" -print0 | \
-    xargs -0 -n 1 -P "$jobs" bash -c 'annotate_file "$@"' _
+find "$input_dir" -type f -name "*.csv" ! -name '._*' -print0 | \
+    xargs -0 -n 1 -P "$jobs" bash -c 'if [ "$#" -gt 0 ]; then annotate_file "$@"; fi' _
 
 echo "All mouse annotation tasks completed."
 exit 0
