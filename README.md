@@ -21,9 +21,30 @@ pip install -r requirements.txt
 Notes:
 
 - Mouse annotation shells out to `Rscript scripts/mouse_annotation.R`, so a
-  local R with `Seurat`, `data.table`, `dplyr`, `ggplot2` and `scMayoMap`
+  local R with `Seurat`, `data.table`, `dplyr`, `ggplot2`, `MAST` and `scMayoMap`
   installed must be on `PATH`. No `rpy2` is required.
+- For mouse annotation alone, the Python entry point needs `pandas`; it does
+  not load the human scimilarity model or its ML dependencies. The standalone
+  `scripts/annotation_mouse.sh` also requires Python 3 for CSV validation
+  (standard library only; set `PYTHON` to select an interpreter).
+- Mouse annotation expects a cells-by-genes CSV: cell IDs in the first column,
+  mouse gene symbols in the header, and non-negative counts. At least 3 cells
+  and 3 variable genes are required. Unsupported clusters are labelled
+  `Unknown`. Completed results must contain one label per input cell;
+  incomplete or malformed results are retried.
 - Keep reference files under `gene_data/` (gene lists, tokens, mid values, etc.).
+
+Mouse regression tests (R helper tests run when `Rscript` is available):
+
+```bash
+python -m unittest discover -s scripts -p 'test_mouse_annotation.py' -v
+```
+
+With all R dependencies installed, run the complete synthetic annotation test:
+
+```bash
+Rscript scripts/test_mouse_annotation_integration.R
+```
 
 ## 2. Directory Conventions
 

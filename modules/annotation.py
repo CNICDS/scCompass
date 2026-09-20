@@ -1,24 +1,25 @@
 import os
 import sys
 import subprocess
-import scanpy as sc
 import pandas as pd
-import anndata as ad
 import datetime
 
-# Make the vendored ``scimilarity`` package importable as a top-level module
-# (it lives at ``modules/scimilarity``). This must happen before the imports
-# below, which run at module load time.
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from .annotation_result import input_cell_count, valid_mouse_result
 
-from scimilarity.src.scimilarity.utils import lognorm_counts
-from scimilarity.src.scimilarity import CellAnnotation, align_dataset
+
+def _load_scimilarity():
+    # Only human/other-species annotation needs the vendored ML stack.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from scimilarity.src.scimilarity.utils import lognorm_counts
+    from scimilarity.src.scimilarity import CellAnnotation, align_dataset
+    return CellAnnotation, align_dataset, lognorm_counts
 
 
 def _resolve_input(afile):
     """Resolve the CSV input file and sample name from either a CSV file
     path (e.g. ``.../<gsm>/<gsm>.csv``) or the sample directory that
     contains it (e.g. ``.../<gsm>``)."""
+    afile = os.fspath(afile)
     if os.path.isfile(afile):
         count_file = os.path.basename(afile)
         if count_file.endswith(".csv"):
@@ -39,6 +40,7 @@ class AnnotationHuman:
 
         # Initialize path variables
         self.annotation_path = annotation_path
+        CellAnnotation, self.align_dataset, self.lognorm_counts = _load_scimilarity()
         self.cell_annotation = CellAnnotation(model_path=self.annotation_path)
 
     def write_logs(self, out_path, step_num, cell_num, success):
@@ -93,6 +95,9 @@ class AnnotationHuman:
         # Start the annotation process
         START_TIME = datetime.datetime.now()
         try:
+            import scanpy as sc
+            import anndata as ad
+
             df = pd.read_csv(input_file, header=0, index_col=0)
             adata = ad.AnnData(df)
             print("Original rows, columns: ", adata.shape[0], adata.shape[1])
@@ -102,9 +107,9 @@ class AnnotationHuman:
                 return
 
             # Align, normalize, and perform dimensionality reduction
-            adata = align_dataset(adata, self.cell_annotation.gene_order)
+            adata = self.align_dataset(adata, self.cell_annotation.gene_order)
             adata.layers["counts"] = adata.X.copy()
-            adata = lognorm_counts(adata)
+            adata = self.lognorm_counts(adata)
             adata.obsm['X_scimilarity'] = self.cell_annotation.get_embeddings(adata.X)
 
             sc.pp.neighbors(adata, use_rep='X_scimilarity')
@@ -153,7 +158,12 @@ class AnnotationMouse:
         self.r_script_path = r_script_path or os.path.join(
             python_module_path, "scripts", "mouse_annotation.R"
         )
-        print("scimilarity imported!")
+        print("Mouse annotation uses Seurat + scMayoMap via Rscript.")
+
+    @staticmethod
+    def _valid_result(result_file, expected_cells=None):
+        """Check the single-column, positional-index contract used by merge."""
+        return valid_mouse_result(result_file, expected_cells)
 
     def write_logs(self, out_path, step_num, cell_num, success):
         """
@@ -172,72 +182,60 @@ class AnnotationMouse:
         Main function to perform the annotation task.
         """
         specie = kwargs.get('specie', 'mouse')  # Default specie is 'mouse'
+        if specie != 'mouse':
+            raise ValueError("Mouse annotation supports only mouse.")
         output_dir = kwargs.get('output_dir', os.path.join(os.getcwd(), "annotated_data"))
 
         input_file, count_file = _resolve_input(afile)
         outfile_dir = f"{output_dir}/{specie}/{count_file}"
         tmpfile = f"{output_dir}/{specie}/{count_file}.tmp"
+        result_file = os.path.join(outfile_dir, f"{count_file}_cell_type.csv")
 
-        # Check if the input directory exists
-        if not os.path.exists(afile):
-            print(f"[Error] Input path does not exist: {afile}")
-            return
+        if not os.path.isfile(input_file):
+            raise FileNotFoundError(f"Mouse annotation input file not found: {input_file}")
 
-        print(f"Annotation Start, [Specie]: {specie}\n[Input Dir]: {afile} [Size]: {os.path.getsize(afile)}\n")
-
-        # Check if the input file exists
-        if not os.path.exists(input_file):
-            print(f"[Error] Input file does not exist: {input_file}")
-            return
-
+        print(f"Annotation Start, [Specie]: {specie}\n[Input File]: {input_file} [Size]: {os.path.getsize(input_file)}\n")
         print(f"Output Dir: {outfile_dir}")
 
-        # Check if annotation has been completed
-        if os.path.exists(outfile_dir):
-            print(f"Ignored, already completed: {afile}")
-            if os.path.exists(tmpfile):
-                os.unlink(tmpfile)  # Remove temporary file if exists
-            return
-
-        # Check if the process is already running
-        if os.path.exists(tmpfile):
+        # Acquire the same lock used by the shell driver atomically. Never
+        # remove another worker's lock, even if its output already exists.
+        os.makedirs(os.path.dirname(tmpfile), exist_ok=True)
+        try:
+            lock = open(tmpfile, 'x')
+        except FileExistsError:
             print(f"Ignored, in progress: {afile}")
             return
 
-        # Create output directory
-        os.makedirs(outfile_dir, exist_ok=True)
-
-        # Create a temporary file to indicate the process is running
-        with open(tmpfile, 'w') as f:
-            f.write(afile)
-
-        # Start the annotation process
-        START_TIME = datetime.datetime.now()
         try:
-            # Run the external Rscript. It reads the count matrix, runs the
-            # Seurat + scMayoMap pipeline, and writes
-            # ``<count_file>_cell_type.csv`` into ``outfile_dir`` itself, using
-            # a 0-based integer index so the layout matches the other-species
-            # annotation path and the downstream merge step.
-            if not os.path.exists(self.r_script_path):
+            with lock:
+                lock.write(os.fspath(afile))
+
+            expected_cells = input_cell_count(input_file)
+            if self._valid_result(result_file, expected_cells):
+                print(f"Ignored, already completed: {afile}")
+                return
+
+            if not os.path.isfile(self.r_script_path):
                 raise FileNotFoundError(
                     f"Mouse annotation R script not found: {self.r_script_path}"
                 )
 
+            os.makedirs(outfile_dir, exist_ok=True)
+            START_TIME = datetime.datetime.now()
             subprocess.run(
                 ["Rscript", self.r_script_path, input_file, outfile_dir, specie],
                 check=True,
             )
+            if not self._valid_result(result_file, expected_cells):
+                raise RuntimeError(f"Mouse annotation did not produce a valid result: {result_file}")
 
             END_TIME = datetime.datetime.now()
             print(f"Time Cost: {(END_TIME - START_TIME).seconds} seconds")
+            self.write_logs(outfile_dir, "7", "-1", True)
             print("Data exported")
-
         finally:
-            # Remove the temporary file and write logs
             if os.path.exists(tmpfile):
                 os.unlink(tmpfile)
-            self.write_logs(outfile_dir, "7", "-1", True)
 
     def __call__(self, data, **kwargs):
         """
@@ -257,6 +255,7 @@ class AnnotationOtherSpecie:
 
         # Initialize path variables
         self.annotation_path = annotation_path
+        CellAnnotation, self.align_dataset, self.lognorm_counts = _load_scimilarity()
         self.cell_annotation = CellAnnotation(model_path=self.annotation_path)
 
     def write_logs(self, out_path, step_num, cell_num, success):
@@ -314,6 +313,9 @@ class AnnotationOtherSpecie:
         # Start the annotation process
         START_TIME = datetime.datetime.now()
         try:
+            import scanpy as sc
+            import anndata as ad
+
             # Load data
             df = pd.read_csv(input_file, header=0, index_col=0)
             adata = ad.AnnData(df)
@@ -333,13 +335,13 @@ class AnnotationOtherSpecie:
             adata = adata[:, unique_index]
 
             # Align with the reference gene set
-            adata = align_dataset(adata, self.cell_annotation.gene_order, gene_overlap_threshold=100)
+            adata = self.align_dataset(adata, self.cell_annotation.gene_order, gene_overlap_threshold=100)
 
             # Store raw counts in a new layer
             adata.layers["counts"] = adata.X.copy()
 
             # Normalize the data
-            adata = lognorm_counts(adata)
+            adata = self.lognorm_counts(adata)
 
             # Dimensionality reduction
             adata.obsm['X_scimilarity'] = self.cell_annotation.get_embeddings(adata.X)

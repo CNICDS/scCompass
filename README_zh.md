@@ -18,10 +18,28 @@ pip install -r requirements.txt
 
 说明：
 
-- 鼠标（mouse）注释通过 `Rscript scripts/mouse_annotation.R` 外部调用完成，
+- 小鼠（mouse）注释通过 `Rscript scripts/mouse_annotation.R` 外部调用完成，
   因此需要本机安装 R，并安装 `Seurat`、`data.table`、`dplyr`、`ggplot2`、
-  `scMayoMap` 等 R 包，且 `Rscript` 在 `PATH` 中可用。不再依赖 `rpy2`。
+  `MAST`、`scMayoMap` 等 R 包，且 `Rscript` 在 `PATH` 中可用。不再依赖 `rpy2`。
+- 单独运行小鼠注释时，Python 入口只需 `pandas`，不会加载人类 scimilarity 模型及其
+  机器学习依赖。独立批处理 `scripts/annotation_mouse.sh` 还需 Python 3 校验 CSV
+  （仅使用标准库，可通过 `PYTHON` 环境变量指定解释器）。
+- 小鼠输入 CSV 应为“细胞 × 基因”：第一列是细胞 ID，表头使用小鼠基因符号，
+  表达量为非负数；至少需要 3 个细胞和 3 个可变基因。无法可靠匹配的聚类标为
+  `Unknown`。完成结果必须为每个输入细胞提供一个标签；不完整或格式错误的结果会重试。
 - `gene_data/` 下需要保留项目自带参考文件（基因列表、token、mid values 等）。
+
+小鼠标注回归测试（`Rscript` 可用时会同时运行 R 辅助函数测试）：
+
+```bash
+python -m unittest discover -s scripts -p 'test_mouse_annotation.py' -v
+```
+
+安装全部 R 依赖后，可运行完整的合成数据标注测试：
+
+```bash
+Rscript scripts/test_mouse_annotation_integration.R
+```
 
 ## 2. 目录约定
 
