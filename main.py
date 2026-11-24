@@ -2,6 +2,7 @@ import argparse
 import glob
 import json
 import os
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -131,7 +132,10 @@ def h5ad_export_pipeline(input_pattern, species, mapping_dir, annotation_dir,
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="scCompass data processing pipeline")
+    parser = argparse.ArgumentParser(
+        description="scCompass data processing pipeline",
+        epilog="Run 'python main.py metadata --help' for metadata collection, review, and CSV export.",
+    )
     parser.add_argument("--species", required=True, help="Species key, e.g. human/mouse/monkey")
     parser.add_argument(
         "--project-root",
@@ -168,6 +172,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    if sys.argv[1:2] == ["metadata"]:
+        entry = Path(__file__).resolve().parent / "integrations" / "metadata_v2" / "cli.py"
+        raise SystemExit(subprocess.run([sys.executable, str(entry), *sys.argv[2:]], check=False).returncode)
     parser = build_parser()
     args = parser.parse_args()
     if "h5ad" in args.steps and not args.h5ad_output:

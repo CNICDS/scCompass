@@ -1,0 +1,56 @@
+rules:
+- target_column: OrganismSimple
+  source_keys:
+  - organism
+  - scientific_name
+  value_map:
+    homo sapiens: Human
+    human: Human
+    mus musculus: Mouse
+    mouse: Mouse
+    rattus norvegicus: Rat
+    rat: Rat
+    pan troglodytes: Chimpanzee
+    chimpanzee: Chimpanzee
+    macaca: Macaque
+    macaque: Macaque
+    cavia porcellus: Guinea_pig
+    guinea pig: Guinea_pig
+    gallus gallus: Chicken
+    chicken: Chicken
+    danio rerio: Zebrafish
+    zebrafish: Zebrafish
+    drosophila: Drosophila
+    default: Other
+- target_column: Class
+  source_keys:
+  - cell type
+  - cell_type
+  - sample type
+  - material type
+  - source
+  value_map:
+    \borganoids?\b: organoid
+    \binduced[ _]cells?\b: induced cell
+    \bpluripotent[ _]stem[ _]cells?\b: pluripotent stem cell
+    \b(?:tumor|cancer)[ _]cell[ _]line\b: tumor cell line
+    \bprimary[ _]cells?\b: primary cell
+    \b(?:native[ _])?tissue\b|^organ$: native tissue
+    default: ''
+- target_column: Gender
+  source_keys:
+  - sex
+  - gender
+  value_map:
+    ^female$|^f$: female
+    ^male$|^m$: male
+    default: ''
+- target_column: Tumor/Cancer
+  source_keys:
+  - disease
+  - disease state
+  - tumor
+  value_map:
+    \b(?:no cancer|non[- ]?tumou?r|non[- ]?cancer|healthy|normal|control)\b|^no$|^n$: 'no'
+    \b(?:tumou?r|cancer|carcinoma|glioblastoma|glioma|leukemia|lymphoma|melanoma|sarcoma)\b|^yes$|^y$: 'yes'
+    default: ''

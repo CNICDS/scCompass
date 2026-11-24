@@ -1,0 +1,4 @@
+value,aliases
+yes,Y|y|true|tumor
+no,N|n|false|normal
+unknown,

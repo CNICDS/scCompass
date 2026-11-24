@@ -134,6 +134,28 @@ python main.py --species human --steps h5ad \
 以唯一的 `SourceID` 匹配样本，完整记录保存在 `uns["sample_metadata_json"]`。
 缺失的注释和组织信息保留为空。此步骤跳过归一化、token 化及 Hugging Face 导出。
 
+### 3.6 使用 metadata_agentv2 获取样本元数据
+
+```bash
+pip install -r requirements-metadata.txt
+python main.py metadata collect --accessions-file samples.txt --output outputs/metadata_collect --resume
+python main.py metadata review --input review_inputs/human.jsonl.gz \
+  --output outputs/metadata_review --limit 10 --env-file /path/to/private.env
+```
+
+`collect` 接受命令行 accession 或每行一个 accession 的文本文件。添加 `--with-llm` 可启用
+模型复核。`review` 接受已有的 JSONL 或 JSONL.gz 快照，每条记录包含 `source`、
+`accession`、`source_url` 和 `raw`。复核可从现有数据库继续，待处理记录可重试。
+可用 `--all` 处理整份快照。
+
+输出目录包含 `canonical.sqlite` 和 `metadata.csv`。把 CSV 传给 h5ad 步骤的
+`--h5ad-metadata`，即可按 `SourceID` 加入已完成的元数据。已有 v2 数据库可通过
+`python main.py metadata export --output /path/to/store_directory` 单独导出。
+
+API 参数通过环境变量或显式传入的私有 dotenv 文件设置，包括 `MODEL_API_KEY`、
+`MODEL`、`MODEL_BASE_URL` 和 `MODEL_API_MODE`。`NCBI_API_KEY` 可选。
+也可用 `--config` 传入私有 agent YAML。请把私有配置放在 Git 仓库外。
+
 ## 4. 主要参数说明
 
 - `--species`: 物种标识，例如 `human`、`mouse`、`monkey`

@@ -1,0 +1,720 @@
+# Authoritative 50-field manifest. Review: output/demo_result校对几条.xlsx.
+version: '4.0'
+columns:
+- name: Organism
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_organism_ch1
+    sra:
+    - _attributes.organism
+    arrayexpress:
+    - characteristics.organism
+    ena:
+    - _attributes.scientific_name
+    gsa:
+    - _attributes.organism
+    biosample:
+    - _attributes.scientific_name
+    - _attributes.organism
+- name: OrganismSimple
+  type: enum
+  enum_ref: organism_simple.csv
+  required: true
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_organism_ch1
+    sra:
+    - _attributes.organism
+    arrayexpress:
+    - characteristics.organism
+    ena:
+    - _attributes.scientific_name
+    gsa:
+    - _attributes.organism
+    biosample:
+    - _attributes.scientific_name
+    - _attributes.organism
+- name: Class
+  type: enum
+  enum_ref: class.csv
+  required: true
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.sample type
+    - Sample_characteristics_ch1.tissue
+    - Sample_source_name_ch1
+    sra:
+    - _attributes.cell_type
+    - _attributes.source_name
+    arrayexpress:
+    - characteristics.cell type
+    - characteristics.material type
+    - characteristics.organism part
+    ena:
+    - _attributes.cell_type
+    - _attributes.sample_type
+    gsa:
+    - _attributes.cell_type
+    - _attributes.sample_type
+    biosample:
+    - _attributes.cell_type
+    - _attributes.sample_type
+    - _attributes.source_name
+  llm_mode: prefer
+  description: 'Assayed material: native tissue, primary cell, pluripotent stem cell, induced cell, tumor cell line,
+    organoid, other. Organoids take precedence over their starting line. Routine dissociation for sequencing does
+    not change native tissue to primary cell. No default cell-line class.'
+- name: Tissue
+  type: semi
+  enum_ref: tissue.csv
+  acquisition: source
+  delimiter: ','
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.tissue
+    - Sample_characteristics_ch1.organ
+    - Sample_characteristics_ch1.body site
+    sra:
+    - _attributes.tissue
+    - _attributes.organ
+    arrayexpress:
+    - characteristics.organism part
+    - characteristics.tissue
+    ena:
+    - _attributes.organism part
+    - _attributes.tissue_type
+    - _attributes.tissue
+    gsa:
+    - _attributes.tissue
+    - _attributes.organ
+    biosample:
+    - _attributes.tissue
+    - _attributes.organ
+    - _attributes.organism_part
+    - _attributes.tissue_type
+  source_merge: all
+  llm_mode: prefer
+  description: Broad source tissue/organ; retain all supported components and expand unambiguous abbreviations.
+    telencephalic organoid maps to brain; organoid belongs to Class. Never invent an ontology parent or ID.
+- name: AnatomicalSite
+  type: semi
+  enum_ref: anatomical_site.csv
+  acquisition: source
+  delimiter: ','
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.brain region
+    - Sample_characteristics_ch1.region
+    - Sample_characteristics_ch1.anatomical site
+    - Sample_characteristics_ch1.body site
+    - Sample_characteristics_ch1.location
+    sra:
+    - _attributes.anatomical_site
+    - _attributes.region
+    arrayexpress:
+    - characteristics.anatomical site
+    - characteristics.region
+    ena:
+    - _attributes.anatomical_site
+    - _attributes.region
+    gsa:
+    - _attributes.anatomical_site
+    - _attributes.region
+    biosample:
+    - _attributes.anatomical_site
+    - _attributes.region
+  source_merge: all
+  llm_mode: prefer
+  description: 'Explicit location finer than Tissue, e.g. telencephalon within brain or macula within eye tissue.
+    Do not repeat Tissue. PBMC is a cell source, not a location. No finer location reported: blank.'
+- name: CellSource/CellSorting
+  type: semi
+  enum_ref: cell_source.csv
+  acquisition: source
+  delimiter: ','
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.cell type
+    - Sample_characteristics_ch1.sorting
+    - Sample_characteristics_ch1.facs marker
+    - Sample_characteristics_ch1.cell subtype
+    - Sample_characteristics_ch1.cell subtype surface markers
+    - Sample_characteristics_ch1.enrichment
+    sra:
+    - _attributes.cell_type
+    - _attributes.cell_subtype
+    arrayexpress:
+    - characteristics.cell type
+    - characteristics.sorting
+    ena:
+    - _attributes.cell_type
+    gsa:
+    - _attributes.cell_type
+    biosample:
+    - _attributes.cell_type
+  source_merge: all
+  llm_mode: prefer
+  description: Concise cell populations and all explicit sorting markers/methods, comma-space separated. Preserve
+    CD45RA- and other polarities. Exclude culture prose and sorting branches for other samples.
+- name: CellLine
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.cell line
+    - Sample_characteristics_ch1.cell_line
+    sra:
+    - _attributes.cell_line
+    arrayexpress:
+    - characteristics.cell line
+    ena:
+    - _attributes.cell_line
+    gsa:
+    - _attributes.cell_line
+    biosample:
+    - _attributes.cell_line
+  description: Explicit cell-line identifier, never sample name, library name or patient/sample code. Keep an explicitly
+    stated starting line for organoids.
+- name: Organoid/Inducible
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.organoid type
+    - Sample_characteristics_ch1.differentiation
+    sra:
+    - _attributes.organoid_type
+    arrayexpress:
+    - characteristics.organoid
+    - characteristics.differentiation
+    ena:
+    - _attributes.organoid_type
+    gsa:
+    - _attributes.organoid_type
+    biosample:
+    - _attributes.organoid_type
+  llm_mode: prefer
+  description: Actual organoid/induced product of this sample, not every differentiation condition mentioned in
+    a shared protocol.
+- name: Organoid/Inducible_begin
+  type: string
+  acquisition: source
+  delimiter: ','
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.starting material
+    - Sample_characteristics_ch1.reprogramming source
+    sra:
+    - _attributes.source_cell
+    arrayexpress:
+    - characteristics.starting material
+    - characteristics.input cell type
+    ena:
+    - _attributes.source_cell
+    gsa:
+    - _attributes.source_cell
+    biosample:
+    - _attributes.source_cell
+  source_merge: all
+  llm_mode: prefer
+  description: Explicit starting material for the organoid/induction process applicable to this sample.
+- name: Organoid/Inducible_end
+  type: string
+  acquisition: source
+  delimiter: ','
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.final product
+    - Sample_characteristics_ch1.differentiated cell type
+    sra:
+    - _attributes.final_cell_type
+    arrayexpress:
+    - characteristics.differentiated cell
+    ena:
+    - _attributes.final_cell_type
+    gsa:
+    - _attributes.final_cell_type
+    biosample:
+    - _attributes.final_cell_type
+  source_merge: all
+  llm_mode: prefer
+  description: Actual final product of that process, not a generic cell type or a sibling condition.
+- name: Infection
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.infection
+    - Sample_characteristics_ch1.virus
+    - Sample_characteristics_ch1.infection status
+    sra:
+    - _attributes.infection
+    - _attributes.virus
+    arrayexpress:
+    - characteristics.infect
+    - characteristics.virus
+    ena:
+    - _attributes.infection
+    gsa:
+    - _attributes.infection
+    biosample:
+    - _attributes.infection
+- name: Tumor/Cancer
+  type: enum
+  enum_ref: tumor_cancer.csv
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.disease
+    - Sample_characteristics_ch1.disease state
+    - Sample_characteristics_ch1.tumor
+    - Sample_characteristics_ch1.subject status
+    sra:
+    - _attributes.disease
+    - _attributes.disease_status
+    arrayexpress:
+    - characteristics.disease
+    - characteristics.disease state
+    ena:
+    - _attributes.disease
+    - _attributes.health_state
+    gsa:
+    - _attributes.disease
+    - _attributes.disease_status
+    biosample:
+    - _attributes.disease
+    - _attributes.disease_status
+    - _attributes.health_state
+- name: Disease
+  type: semi
+  enum_ref: disease.csv
+  acquisition: source
+  delimiter: ','
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.disease
+    - Sample_characteristics_ch1.disease state
+    - Sample_characteristics_ch1.subject status
+    sra:
+    - _attributes.disease
+    arrayexpress:
+    - characteristics.disease
+    ena:
+    - _attributes.disease
+    gsa:
+    - _attributes.disease
+    biosample:
+    - _attributes.disease
+  source_merge: all
+  llm_mode: prefer
+  description: Sample/donor disease, not a disease merely discussed by the project. Do not give controls a cohort
+    disease.
+- name: DiseaseSubtype
+  type: semi
+  enum_ref: disease_subtype.csv
+  acquisition: source
+  delimiter: ','
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.cancer type
+    - Sample_characteristics_ch1.tumor type
+    - Sample_characteristics_ch1.disease subtype
+    sra:
+    - _attributes.disease_subtype
+    arrayexpress:
+    - characteristics.disease subtype
+    ena:
+    - _attributes.disease_subtype
+    gsa:
+    - _attributes.disease_subtype
+    biosample:
+    - _attributes.disease_subtype
+  source_merge: all
+  llm_mode: prefer
+  description: More specific diagnosis belonging to Disease; never add an unrelated cancer or infer a subtype from
+    an ontology candidate.
+- name: DiseaseStage/Grade
+  type: string
+  acquisition: source
+  llm_mode: prefer
+  delimiter: ','
+  source_merge: all
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.tumor stage
+    - Sample_characteristics_ch1.disease stage
+    - Sample_characteristics_ch1.stage
+    - Sample_characteristics_ch1.grade
+    - Sample_characteristics_ch1.tumor grade
+    arrayexpress:
+    - characteristics.disease stage
+    - characteristics.tumor stage
+    - characteristics.grade
+    sra:
+    - _attributes.tumor_stage
+    - _attributes.disease_stage
+    - _attributes.stage
+    - _attributes.grade
+    ena:
+    - _attributes.tumor_stage
+    - _attributes.disease_stage
+    - _attributes.stage
+    - _attributes.grade
+    gsa:
+    - _attributes.tumor_stage
+    - _attributes.disease_stage
+    - _attributes.stage
+    - _attributes.grade
+    biosample:
+    - _attributes.tumor_stage
+    - _attributes.disease_stage
+    - _attributes.stage
+    - _attributes.grade
+  description: Explicit stage/grade only, retain system/label such as T2. GBM is a diagnosis, not stage/grade. Never
+    infer WHO grade.
+- name: Genotype
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.genotype
+    - Sample_characteristics_ch1.genotype/variation
+    sra:
+    - _attributes.genotype
+    arrayexpress:
+    - characteristics.genotype
+    ena:
+    - _attributes.genotype
+    gsa:
+    - _attributes.genotype
+    biosample:
+    - _attributes.genotype
+  description: Sample allele, variant or engineered genotype. patient derived is provenance, not genotype.
+- name: Age
+  type: string
+  number: true
+  numeric_kind: real
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.age
+    sra:
+    - _attributes.age
+    arrayexpress:
+    - characteristics.age
+    ena:
+    - _attributes.age
+    gsa:
+    - _attributes.age
+    biosample:
+    - _attributes.age
+  llm_mode: prefer
+  description: Numeric chronological donor age in years. Culture age, passage or sample-name digits are not donor
+    age. Unknown is blank, never zero.
+- name: Time
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.time
+    - Sample_characteristics_ch1.time point
+    - Sample_characteristics_ch1.culture duration
+    arrayexpress:
+    - characteristics.time
+    - characteristics.time point
+    sra:
+    - _attributes.time
+    - _attributes.time_point
+    - _attributes.culture_duration
+    ena:
+    - _attributes.time
+    - _attributes.time_point
+    - _attributes.culture_duration
+    gsa:
+    - _attributes.time
+    - _attributes.time_point
+    - _attributes.culture_duration
+    biosample:
+    - _attributes.time
+    - _attributes.time_point
+    - _attributes.culture_duration
+  llm_mode: prefer
+  description: Experimental/culture elapsed time with units, not donor age or passage. A single time point only;
+    explicit intervals go in TimeRange.
+- name: AgeRange
+  type: string
+  acquisition: free_text
+  description: Explicit donor-age interval with units only. Never copy a single age or culture time.
+- name: TimeRange
+  type: string
+  acquisition: free_text
+  description: Explicit experimental-time interval with units only. Never copy a single time point.
+- name: Gender
+  type: enum
+  enum_ref: gender.csv
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.sex
+    - Sample_characteristics_ch1.gender
+    sra:
+    - _attributes.sex
+    arrayexpress:
+    - characteristics.sex
+    ena:
+    - _attributes.sex
+    gsa:
+    - _attributes.sex
+    biosample:
+    - _attributes.sex
+    - _attributes.gender
+  description: Reported donor sex only. Never infer from cell line, sample ID or expression. Predicted gender is
+    not part of this schema.
+- name: Genotype_donor
+  type: string
+  acquisition: free_text
+  description: Explicit donor genotype, not inferred from sample engineering.
+- name: Race
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.race
+    - Sample_characteristics_ch1.ethnicity
+    sra:
+    - _attributes.race
+    - _attributes.ethnicity
+    arrayexpress:
+    - characteristics.ethnic group
+    ena:
+    - _attributes.race
+    gsa:
+    - _attributes.race
+    biosample:
+    - _attributes.race
+    - _attributes.ethnicity
+- name: Treatment
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_characteristics_ch1.treatment
+    - Sample_characteristics_ch1.agent
+    - Sample_characteristics_ch1.stimulation
+    sra:
+    - _attributes.treatment
+    arrayexpress:
+    - characteristics.compound
+    - characteristics.treatment
+    - characteristics.dose
+    ena:
+    - _attributes.treatment
+    gsa:
+    - _attributes.treatment
+    biosample:
+    - _attributes.treatment
+  llm_mode: prefer
+  delimiter: ','
+  source_merge: all
+  description: Sample-specific intervention with available dose/duration. Do not assign every arm in a shared protocol.
+- name: OveralDesign
+  type: string
+  acquisition: free_text
+  description: Full study-level Series_overall_design. Never substitute extraction/library protocol.
+- name: ExtractionProtocol
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_extract_protocol_ch1
+    arrayexpress:
+    - comments.extraction protocol
+  source_merge: all
+  description: All source paragraphs, including dissociation and library construction, in source order. Do not summarize.
+- name: TreatmentProtocol
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_treatment_protocol_ch1
+    arrayexpress:
+    - comments.treatment protocol
+  source_merge: all
+  description: Full applicable treatment protocol. Cross-reference-only text is unresolved, not confirmed absence.
+- name: GrowthProtocol
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_growth_protocol_ch1
+    arrayexpress:
+    - comments.growth protocol
+  source_merge: all
+  description: Full culture protocol. A tissue/product name is not a protocol.
+- name: AnnotationMethod
+  type: string
+  acquisition: tiered
+  llm_mode: disabled
+- name: Source
+  type: string
+  system: true
+  required: true
+  acquisition: system
+- name: SourceID
+  type: string
+  system: true
+  required: true
+  acquisition: system
+- name: SeriesID
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_series_id
+    sra:
+    - study_accession
+    arrayexpress:
+    - study_accession
+    ena:
+    - study_accession
+    gsa:
+    - study_accession
+    biosample:
+    - study_accession
+  delimiter: ','
+  source_merge: all
+- name: SampleName
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_title
+    sra:
+    - _attributes.sample_title
+    - title
+    arrayexpress:
+    - characteristics.label
+    - sample_name
+    ena:
+    - _attributes.sample_title
+    - title
+    gsa:
+    - _attributes.sample_title
+    - title
+    biosample:
+    - _attributes.sample_title
+    - title
+- name: Address
+  type: string
+  acquisition: source
+  source_map:
+    geo:
+    - Sample_geo_accession
+    sra:
+    - run_accession
+    arrayexpress:
+    - experiment_accession
+    ena:
+    - run_accession
+    gsa:
+    - run_accession
+    biosample:
+    - run_accession
+- name: License
+  type: enum
+  enum_ref: license.csv
+  acquisition: tiered
+  llm_mode: disabled
+- name: Library
+  type: enum
+  enum_ref: library.csv
+  acquisition: tiered
+  llm_mode: disabled
+- name: Assay
+  type: enum
+  enum_ref: assay.csv
+  acquisition: tiered
+  llm_mode: disabled
+- name: RNASource
+  type: enum
+  enum_ref: rna_source.csv
+  acquisition: tiered
+  llm_mode: disabled
+- name: RawFile
+  type: enum
+  enum_ref: raw_file.csv
+  acquisition: tiered
+  llm_mode: disabled
+- name: RawSize_GB
+  type: string
+  export_as: RawSize(GB)
+  number: true
+  numeric_kind: real
+  acquisition: tiered
+  llm_mode: disabled
+- name: Citation
+  type: string
+  acquisition: tiered
+  llm_mode: disabled
+  delimiter: ','
+  source_merge: all
+- name: Journal
+  type: string
+  acquisition: tiered
+  llm_mode: disabled
+  delimiter: ','
+  source_merge: all
+- name: Year
+  type: string
+  number: true
+  numeric_kind: integer
+  acquisition: tiered
+  llm_mode: disabled
+  description: Publication year from the publication record, never GEO submission/update year. Blank if linked publications
+    have different years.
+- name: CellNumberRaw
+  type: string
+  number: true
+  numeric_kind: integer
+  acquisition: tiered
+  llm_mode: disabled
+- name: CellNumberAfterQC
+  type: string
+  number: true
+  numeric_kind: integer
+  acquisition: tiered
+  llm_mode: disabled
+- name: CellNumberAfterAnnotation
+  type: string
+  number: true
+  numeric_kind: integer
+  acquisition: tiered
+  llm_mode: disabled
+- name: MedianUmi
+  type: string
+  number: true
+  numeric_kind: real
+  acquisition: tiered
+  llm_mode: disabled
+- name: DoubletsPerc
+  type: string
+  number: true
+  numeric_kind: real
+  acquisition: tiered
+  llm_mode: disabled
+- name: Score
+  type: string
+  acquisition: placeholder
+  llm_mode: disabled
+- name: Pubmed ID
+  type: string
+  acquisition: tiered
+  llm_mode: disabled
+  delimiter: ','
+  source_merge: all
+  description: All verified linked PubMed IDs as text, comma-space separated. Never guess from dates or sample codes.
+review_policy: true
