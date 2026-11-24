@@ -7,6 +7,7 @@ scCompass 是一个用于多物种 scRNA-seq 数据预处理与整合的流水�
 - `annotate`: 细胞类型注释
 - `map`: 将基因映射到统一核心基因空间
 - `merge`: 按物种与器官聚合细胞数据
+- `h5ad`: 每个完成基因映射的样本导出一个 AnnData 文件
 
 ## 1. 环境准备
 
@@ -112,10 +113,31 @@ python main.py \
 
 `--metadata-path` 目录下需要包含 `<species>.xlsx`（例如 `human.xlsx`），并至少包含 `Organ` 列。
 
+### 3.5 按样本导出 h5ad
+
+```bash
+python main.py --species human --steps h5ad \
+  --filter-output /path/to/outputs/filtered_data \
+  --map-output /path/to/outputs/mapping_data \
+  --annotate-output /path/to/outputs/annotated_data \
+  --h5ad-metadata /path/to/metadata.csv.gz \
+  --h5ad-output /path/to/outputs/h5ad_data
+```
+
+在 `map` 完成后执行，也可在同一条命令的 `--steps` 中把 `h5ad` 放在 `map` 后。
+结果写入 `<h5ad-output>/<species>/<sample>.h5ad`，按 GSM 命名的样本每个 GSM 一个文件。
+默认从 `--filter-output` 寻找过滤结果，可用 `--filtered-pattern` 选择部分样本。
+过滤后没有细胞的样本会跳过。每个文件通过矩阵和元数据回读校验后才替换目标文件。
+
+`X` 保存映射后的稀疏整数计数，基因列顺序与映射一致。`var["gene_id"]` 保留原始基因 ID，
+`obs` 保存原始条码和可用注释。可选的 `--h5ad-metadata` 接受 CSV 或 CSV.gz，
+以唯一的 `SourceID` 匹配样本，完整记录保存在 `uns["sample_metadata_json"]`。
+缺失的注释和组织信息保留为空。此步骤跳过归一化、token 化及 Hugging Face 导出。
+
 ## 4. 主要参数说明
 
 - `--species`: 物种标识，例如 `human`、`mouse`、`monkey`
-- `--steps`: 要执行的步骤，支持组合：`filter normalize annotate map merge`
+- `--steps`: 要执行的步骤，支持组合：`filter normalize annotate map merge h5ad`
 - `--project-root`: 项目根目录（应包含 `gene_data/` 与 `modules/`）
 - `--input-pattern`: 原始 CSV 输入 glob（`filter` 必填）
 - `--filtered-pattern`: 过滤后 CSV 输入 glob（`normalize`/`annotate`/`map` 必填）

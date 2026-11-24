@@ -95,7 +95,6 @@ class AnnotationHuman:
         # Start the annotation process
         START_TIME = datetime.datetime.now()
         try:
-            import scanpy as sc
             import anndata as ad
 
             df = pd.read_csv(input_file, header=0, index_col=0)
@@ -112,10 +111,7 @@ class AnnotationHuman:
             adata = self.lognorm_counts(adata)
             adata.obsm['X_scimilarity'] = self.cell_annotation.get_embeddings(adata.X)
 
-            sc.pp.neighbors(adata, use_rep='X_scimilarity')
-            sc.tl.umap(adata)
-
-            # Generate annotation results
+            # Predict cell types directly from the model embeddings.
             predictions, nn_idxs, nn_dists, nn_stats = self.cell_annotation.get_predictions_kNN(
                 adata.obsm['X_scimilarity']
             )
