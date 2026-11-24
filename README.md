@@ -141,6 +141,28 @@ Optional `--h5ad-metadata` accepts CSV or CSV.gz with a unique `SourceID` per sa
 matched record is stored in `uns["sample_metadata_json"]`. Missing annotations and tissue stay
 missing. This step runs without normalization, tokenization or Hugging Face export.
 
+### 3.6 Sample metadata with metadata_agentv2
+
+```bash
+pip install -r requirements-metadata.txt
+python main.py metadata collect --accessions-file samples.txt --output outputs/metadata_collect --resume
+python main.py metadata review --input review_inputs/human.jsonl.gz \
+  --output outputs/metadata_review --limit 10 --env-file /path/to/private.env
+```
+
+`collect` accepts accession arguments or a text file with one accession per line. Add
+`--with-llm` for model review. `review` accepts a packed JSONL or JSONL.gz snapshot with
+`source`, `accession`, `source_url` and `raw` in each record. It resumes from the canonical store,
+retries pending records, and takes `--all` for a full review.
+
+The output directory contains `canonical.sqlite` and `metadata.csv`. Pass that CSV to
+`--h5ad-metadata` to match completed metadata by `SourceID`. To export an existing v2 canonical
+store, run `python main.py metadata export --output /path/to/store_directory`.
+
+Set `MODEL_API_KEY`, `MODEL`, `MODEL_BASE_URL` and `MODEL_API_MODE` in the environment or in an
+explicitly supplied private dotenv file. `NCBI_API_KEY` is optional. You can also pass a private
+agent YAML with `--config`. Keep these private files outside the repository.
+
 ## 4. Key Parameters
 
 - `--species`: species key, e.g. `human`, `mouse`, `monkey`
