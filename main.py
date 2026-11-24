@@ -1,6 +1,9 @@
 import argparse
 import glob
+import json
 import os
+import sys
+import traceback
 from typing import Iterable, List
 
 
@@ -19,24 +22,42 @@ def _ensure_files(files: Iterable[str], pattern: str) -> List[str]:
     return resolved
 
 
-def data_filtering_pipeline(input_pattern: str, species_name: str, output_dir: str, base_dir: str) -> None:
+def _run_samples(instance, files, *, step, continue_on_error=False, error_log=None, **kwargs):
+    failures = 0
+    for file in files:
+        try:
+            print(f"[{step}] Processing {file}", flush=True)
+            instance(data=file, **kwargs)
+        except Exception as exc:
+            if not continue_on_error:
+                raise
+            failures += 1
+            record = {"step": step, "file": file, "error": str(exc),
+                      "exception": type(exc).__name__, "traceback": traceback.format_exc()}
+            print(f"[{step}] Failed {file}: {exc}", file=sys.stderr, flush=True)
+            if error_log:
+                with open(error_log, "a") as stream:
+                    stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return failures
+
+
+def data_filtering_pipeline(input_pattern: str, species_name: str, output_dir: str, base_dir: str, **run_options) -> int:
     from modules import Filter
 
     filter_ref_path = os.path.join(base_dir, "gene_data", "cell_ref")
     filter_instance = Filter(ref_path=filter_ref_path)
     files = _ensure_files(_sorted_files(input_pattern), input_pattern)
-    for file in files:
-        filter_instance(data=file, specie=species_name, output_dir=output_dir)
+    return _run_samples(filter_instance, files, step="filter", specie=species_name,
+                        output_dir=output_dir, **run_options)
 
 
-def data_normalization_pipeline(input_pattern: str, species_name: str, output_dir: str, base_dir: str) -> None:
+def data_normalization_pipeline(input_pattern: str, species_name: str, output_dir: str, base_dir: str, **run_options) -> int:
     from modules import GeneDataNormalization
 
     ref_path = os.path.join(base_dir, "gene_data", "cell_ref")
     normalization_instance = GeneDataNormalization(species_name, ref_path)
     files = _ensure_files(_sorted_files(input_pattern), input_pattern)
-    for file in files:
-        normalization_instance(data=file, output_dir=output_dir)
+    return _run_samples(normalization_instance, files, step="normalize", output_dir=output_dir, **run_options)
 
 
 def data_annotation_pipeline(
@@ -45,7 +66,8 @@ def data_annotation_pipeline(
     output_dir: str,
     base_dir: str,
     annotation_model_path: str,
-) -> None:
+    **run_options,
+) -> int:
     from modules import AnnotationHuman
     from modules import AnnotationMouse
     from modules import AnnotationOtherSpecie
@@ -69,23 +91,18 @@ def data_annotation_pipeline(
         )
 
     files = _ensure_files(_sorted_files(input_pattern), input_pattern)
-    for file in files:
-        annotation_instance(
-            data=file,
-            specie=species_name,
-            output_dir=output_dir,
-            homologous_gene_dir=homologous_gene_dir,
-        )
+    return _run_samples(annotation_instance, files, step="annotate", specie=species_name,
+                        output_dir=output_dir, homologous_gene_dir=homologous_gene_dir, **run_options)
 
 
-def gene_mapping_pipeline(input_pattern: str, species_name: str, output_dir: str, base_dir: str) -> None:
+def gene_mapping_pipeline(input_pattern: str, species_name: str, output_dir: str, base_dir: str, **run_options) -> int:
     from modules import GeneMapping
 
     mapping_ref_path = os.path.join(base_dir, "gene_data", "cell_ref")
     mapping_instance = GeneMapping(ref_path=mapping_ref_path, output_dir=output_dir)
     files = _ensure_files(_sorted_files(input_pattern), input_pattern)
-    for file in files:
-        mapping_instance(data=file, specie=species_name, output_dir=output_dir)
+    return _run_samples(mapping_instance, files, step="map", specie=species_name,
+                        output_dir=output_dir, **run_options)
 
 
 def gene_merging_pipeline(
@@ -125,6 +142,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--map-output", default="/path/to/outputs/mapping_data")
     parser.add_argument("--merge-output", default="/path/to/outputs/merged_data")
     parser.add_argument("--metadata-path", help="Metadata directory containing <species>.xlsx (used by merge)")
+    parser.add_argument("--continue-on-error", action="store_true",
+                        help="Continue other samples after a failure; exit 2 if any sample failed")
+    parser.add_argument("--error-log", help="Append sample failures as JSON Lines")
     parser.add_argument(
         "--annotation-model-path",
         default="/path/to/modules/scimilarity/models/annotation_model_v1",
@@ -146,30 +166,37 @@ def main() -> None:
         args.metadata_path = _normalize_path(args.metadata_path)
 
     base_dir = args.project_root
+    run_options = {"continue_on_error": args.continue_on_error, "error_log": args.error_log}
+    if args.error_log:
+        args.error_log = _normalize_path(args.error_log)
+        os.makedirs(os.path.dirname(args.error_log), exist_ok=True)
+        run_options["error_log"] = args.error_log
+    failures = 0
 
     for step in args.steps:
         if step == "filter":
             if not args.input_pattern:
                 raise ValueError("--input-pattern is required when step includes 'filter'")
-            data_filtering_pipeline(args.input_pattern, args.species, args.filter_output, base_dir)
+            failures += data_filtering_pipeline(args.input_pattern, args.species, args.filter_output, base_dir, **run_options)
         elif step == "normalize":
             if not args.filtered_pattern:
                 raise ValueError("--filtered-pattern is required when step includes 'normalize'")
-            data_normalization_pipeline(args.filtered_pattern, args.species, args.normalize_output, base_dir)
+            failures += data_normalization_pipeline(args.filtered_pattern, args.species, args.normalize_output, base_dir, **run_options)
         elif step == "annotate":
             if not args.filtered_pattern:
                 raise ValueError("--filtered-pattern is required when step includes 'annotate'")
-            data_annotation_pipeline(
+            failures += data_annotation_pipeline(
                 args.filtered_pattern,
                 args.species,
                 args.annotate_output,
                 base_dir,
                 args.annotation_model_path,
+                **run_options,
             )
         elif step == "map":
             if not args.filtered_pattern:
                 raise ValueError("--filtered-pattern is required when step includes 'map'")
-            gene_mapping_pipeline(args.filtered_pattern, args.species, args.map_output, base_dir)
+            failures += gene_mapping_pipeline(args.filtered_pattern, args.species, args.map_output, base_dir, **run_options)
         elif step == "merge":
             if not args.metadata_path:
                 raise ValueError("--metadata-path is required when step includes 'merge'")
@@ -180,6 +207,9 @@ def main() -> None:
                 args.merge_output,
                 args.metadata_path,
             )
+    if failures:
+        print(f"Completed with {failures} failed sample operation(s).", file=sys.stderr)
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":
