@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import traceback
+from pathlib import Path
 from typing import Iterable, List
 
 
@@ -118,6 +119,17 @@ def gene_merging_pipeline(
     merge_instance()
 
 
+def h5ad_export_pipeline(input_pattern, species, mapping_dir, annotation_dir,
+                         output_dir, metadata_path, **run_options):
+    from modules.h5ad_export import H5adExporter
+
+    files = _ensure_files(_sorted_files(input_pattern), input_pattern)
+    if len({Path(file).stem for file in files}) != len(files):
+        raise ValueError("h5ad input files must have unique sample names")
+    exporter = H5adExporter(species, mapping_dir, annotation_dir, output_dir, metadata_path)
+    return _run_samples(exporter, files, step="h5ad", **run_options)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="scCompass data processing pipeline")
     parser.add_argument("--species", required=True, help="Species key, e.g. human/mouse/monkey")
@@ -130,17 +142,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--steps",
         nargs="+",
         required=True,
-        choices=["filter", "normalize", "annotate", "map", "merge"],
+        choices=["filter", "normalize", "annotate", "map", "merge", "h5ad"],
         help="One or more pipeline steps to run in order",
     )
     parser.add_argument("--input-pattern", help="Glob for raw CSV files (used by filter)")
-    parser.add_argument("--filtered-pattern", help="Glob for filtered CSV files (used by normalize/annotate)")
+    parser.add_argument("--filtered-pattern", help="Glob for filtered CSV files (used by normalize/annotate/map/h5ad)")
     parser.add_argument("--annotated-pattern", help="Glob for annotated CSV files (used by map)")
     parser.add_argument("--filter-output", default="/path/to/outputs/filtered_data")
     parser.add_argument("--normalize-output", default="/path/to/outputs/normalization_data")
     parser.add_argument("--annotate-output", default="/path/to/outputs/annotated_data")
     parser.add_argument("--map-output", default="/path/to/outputs/mapping_data")
     parser.add_argument("--merge-output", default="/path/to/outputs/merged_data")
+    parser.add_argument("--h5ad-output", help="Output root for one <sample>.h5ad per mapped sample")
+    parser.add_argument("--h5ad-metadata", help="Optional CSV or CSV.gz with SourceID and sample metadata")
     parser.add_argument("--metadata-path", help="Metadata directory containing <species>.xlsx (used by merge)")
     parser.add_argument("--continue-on-error", action="store_true",
                         help="Continue other samples after a failure; exit 2 if any sample failed")
@@ -154,7 +168,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    args = build_parser().parse_args()
+    parser = build_parser()
+    args = parser.parse_args()
+    if "h5ad" in args.steps and not args.h5ad_output:
+        parser.error("--h5ad-output is required when step includes 'h5ad'")
     args.project_root = _normalize_path(args.project_root)
     args.filter_output = _normalize_path(args.filter_output)
     args.normalize_output = _normalize_path(args.normalize_output)
@@ -206,6 +223,16 @@ def main() -> None:
                 args.species,
                 args.merge_output,
                 args.metadata_path,
+            )
+        elif step == "h5ad":
+            failures += h5ad_export_pipeline(
+                args.filtered_pattern or os.path.join(args.filter_output, args.species, "*", "*.csv"),
+                args.species,
+                args.map_output,
+                args.annotate_output,
+                _normalize_path(args.h5ad_output),
+                _normalize_path(args.h5ad_metadata) if args.h5ad_metadata else None,
+                **run_options,
             )
     if failures:
         print(f"Completed with {failures} failed sample operation(s).", file=sys.stderr)

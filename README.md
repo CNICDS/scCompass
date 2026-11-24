@@ -9,6 +9,7 @@ scCompass is a multi-species scRNA-seq preprocessing and integration pipeline wi
 - `annotate`: cell type annotation
 - `map`: map genes to a unified core-gene space
 - `merge`: aggregate cells by species and organ
+- `h5ad`: export one AnnData file per mapped sample
 
 ## 1. Environment
 
@@ -117,10 +118,33 @@ mapped count matrix (from the map step), so both `--annotate-output` and
 
 `--metadata-path` must contain `<species>.xlsx` (for example `human.xlsx`) with at least the `Organ` column.
 
+### 3.5 Export h5ad per sample
+
+```bash
+python main.py --species human --steps h5ad \
+  --filter-output /path/to/outputs/filtered_data \
+  --map-output /path/to/outputs/mapping_data \
+  --annotate-output /path/to/outputs/annotated_data \
+  --h5ad-metadata /path/to/metadata.csv.gz \
+  --h5ad-output /path/to/outputs/h5ad_data
+```
+
+Run after `map`, or add `h5ad` after `map` in the same `--steps` list. The exporter writes
+`<h5ad-output>/<species>/<sample>.h5ad`, one file per GSM when the sample filenames use GSM IDs.
+It reads filtered CSVs from `--filter-output`; use `--filtered-pattern` to select a subset.
+Samples with no cells after filtering are skipped. Each file is read back to check the matrix
+and metadata before replacing any existing output.
+
+`X` holds sparse integer counts in the original mapping column order. The original gene IDs
+are in `var["gene_id"]`, and cell barcodes and available annotations are in `obs`.
+Optional `--h5ad-metadata` accepts CSV or CSV.gz with a unique `SourceID` per sample. The full
+matched record is stored in `uns["sample_metadata_json"]`. Missing annotations and tissue stay
+missing. This step runs without normalization, tokenization or Hugging Face export.
+
 ## 4. Key Parameters
 
 - `--species`: species key, e.g. `human`, `mouse`, `monkey`
-- `--steps`: steps to run, any combination of `filter normalize annotate map merge`
+- `--steps`: steps to run, any combination of `filter normalize annotate map merge h5ad`
 - `--project-root`: project root containing `gene_data/` and `modules/`
 - `--input-pattern`: input CSV glob (required for `filter`)
 - `--filtered-pattern`: filtered CSV glob (required for `normalize`/`annotate`/`map`)
